@@ -136,7 +136,7 @@ drawBg: function (cxt, width, space) {
 
 ## 落子位置判定
 
-使用 **getBoundingClientRect()** 方法可以取得棋盘相对视口的位置，与点击事件的clientX/Y做差，就可以得出点击位置相对棋盘的偏移量，这样就可以计算出落子的位置了。
+使用 **getBoundingClientRect()** 方法可以取得棋盘相对视口的位置，与点击事件的**clientX/Y**做差，就可以得出点击位置相对棋盘的偏移量，再做相应计算得出落子的位置。
 
 ## 悔棋、撤销悔棋功能
 
@@ -154,12 +154,11 @@ this.actionDom = [];
 //记录悔了几步棋
 this.backActionNum = 0;
 ```
-实现悔棋，需要将每一步记录下来，使用的是一个数组，调用**slice**就可以取对应的数据，因为数据简单，所以[color, x, y, color, x, y ....]这样的数据格式就满足需求了，如果数据量复杂，还是用对象比较方便，就像这样[{...},{...}...]。
+实现悔棋，需要将每一步记录下来，使用的是一个数组，调用**slice**就可以取对应的数据，因为数据简单，所以 **[color, x, y, color, x, y ....]** 这样的数据格式就满足需求了，如果数据量复杂，还是用对象比较方便，就像这样 **[{...},{...}...]** 。
 
-在悔棋、撤销悔棋的过程中，只要不做落子操作，**this.action**里的数据是不变的，只有等待落子后，才会去增删this.action的数据。
 
 ### 删子
-悔棋意味着要删子，从**this.action**取出的数据可以清晰明了的知道子的位置。
+悔棋意味着要删子，从**this.action**取出的对应数据执行相应操作。
 
 #### canvas：
 知道位子信息，调用**clearRect** 即可清理对应的画布。
@@ -167,7 +166,7 @@ this.backActionNum = 0;
 this.cavchessCxt.clearRect(x, y, witdh, height);
 ```
 #### dom：
-**this.actionDom = []** 这个数组是存储棋子dom的，悔棋则取出最后一个删掉即可。
+**this.actionDom = []** 这个数组是存储棋子dom的，悔棋取出最后一个删掉即可。
 ```js
 this.wrap.removeChild(this.actionDom.pop());
 ```
@@ -185,8 +184,7 @@ clearChress: function (x, y, witdh, height) {
 ```
 
 ### 撤销悔棋
-
-因为悔棋
+**this.backActionNum** 属性是存储悔棋步数的，并且在悔棋、撤销悔棋的过程中，只要不做落子操作，**this.action**里的数据是不变的，只有等待落子后，才会根据悔棋步数增删this.action的数据。所以撤销悔棋也只是依据悔棋步数找到对应棋子的信息，把它添加回来就好了。
 
 
 ## 胜负判定
