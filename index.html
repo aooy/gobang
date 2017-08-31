@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<head>
+	<title>五子棋</title>
+	<link rel="stylesheet" type="text/css" href="fiveChess.css">
+</head>
+<!-- <meta name="viewport" content="width=device-width,user-scalable=no,maximum=1.0,minimum=1.0,initial-scale=1.0"/> -->
+<body>
+
+<div id="wrap"></div>
+
+<div class="btnCon">
+	<button type="button" id="backBtn">悔棋</button>
+	<button type="button" id="revokeBackBtn">撤销悔棋</button>
+	<button type="button" id="reStartBtn">重新开始</button>
+</div>
+
+</body>
+<script type="text/javascript" src="./fiveChress.js"></script>
+<script type="text/javascript">
+	//初始化
+	var option = {
+		'width': 480,
+		'containId': '#wrap',
+		'backId': '#backBtn',
+		'revokeBackId': '#revokeBackBtn',
+		'restartId': '#reStartBtn',
+		'winCallback': function(bool){
+			var color = bool?'黑':'白';
+			setTimeout(function(){
+				alert(color+'棋赢');
+			},0)
+		}
+	};
+	var fiveChressobj = new FiveChess(option);
+	fiveChressobj.init();
+</script>
