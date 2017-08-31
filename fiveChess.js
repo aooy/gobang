@@ -7,7 +7,6 @@
 
 	function isDef (s) { return s !== undefined; }
 
-	//参数依次为棋盘宽、容器id、两个悔棋按钮的id
 	function FiveChess (option) {
 		//棋盘的宽度,不能低于35px
 		this.width = (isDef(option.width) && Number(option.width) !== NaN && (Number(option.width)>35)) ? Number(option.width) : 480;
