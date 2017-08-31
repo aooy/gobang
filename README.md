@@ -3,6 +3,9 @@
 canvas和dom双版本实现，在不支持canvas时回退为dom版本。
 目前实现了判定胜负、悔棋和撤销悔棋功能。人机对战部分待开发。。。
 
+# 在线demo
+[点这里](https://aooy.github.io/gobang/)
+
 ### 初始化:
 
 ```js
