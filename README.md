@@ -13,7 +13,7 @@ new FiveChess(parameters).init();
 ```js
 //example
 var chess = new FiveChess({
-       'width': 320
+       'width': 320,
        'containId': '#myId'，
        'backId': '#backBtn'
    });
