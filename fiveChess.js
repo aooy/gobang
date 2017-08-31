@@ -8,7 +8,7 @@
 	function isDef (s) { return s !== undefined; }
 
 	function FiveChess (option) {
-		//棋盘的宽度,不能低于35px
+		//棋盘的宽度,不能低于32px
 		this.width = (isDef(option.width) && Number(option.width) !== NaN && (Number(option.width)>=32)) ? Number(option.width) : 480;
 		//外层包裹的div
 		this.wrap = document.querySelector(option.containId);
