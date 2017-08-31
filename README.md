@@ -1,29 +1,32 @@
 # 五子棋
 
 canvas和dom双版本实现，在不支持canvas时回退为dom版本。
-目前实现了判定胜负、悔棋和撤销悔棋功能。
-人机对战待开发。。。
+目前实现了判定胜负、悔棋和撤销悔棋功能。人机对战部分待开发。。。
 
 ### 初始化:
 
 ```js
-new FiveChess(parameters);
+new FiveChess(parameters).init();
 ```
 **parameters**是一个传递初始化参数的对象。
 
 ```js
 //example
-var myIce = new FiveChess({
+var chess = new FiveChess({
+       'width': 320
        'containId': '#myId'，
        'backId': '#backBtn'
    });
+chess.init();
 ```
+### init 方法
+执行棋盘初始化。
 
 ### parameters
 
 参数     |   类型  |     默认    |                        描述
 ------- | ------- | ---------- | -------------------------------------------------
-width  | number | 480 | 指定棋盘大小，单位是px。参数不能小于35， 如果小于，使用默认值。会绘制成标准的15*15棋盘
+width  | number | 480 | 指定棋盘大小，单位是px。参数不能小于32， 如果小于，使用默认值。会绘制成标准的15*15棋盘,所以横竖各有16格，设定的宽度尽量取16的倍数，默认向下取整，如果不是16的倍数，绘制的棋盘会比设定值稍小。
 containId | string | null | 必须。容器的id
 backId | string | null | 触发悔棋的元素id
 revokeBackId | string | null | 触发撤销悔棋的元素id
@@ -31,4 +34,170 @@ restartId  | string | null | 触发重新开始的元素id
 winCallback  | function | null | 判定胜利的回调函数，会传入一个布尔值，true表示先手赢，false表示后手赢
 bcolor  |  string | black | 先手棋子的颜色
 wcolor | string | #dbdede | 后手棋子的颜色
+
+# 思考过程
+
+### 基本思路
+五子棋的实现基本就两种，一种用canvas，一种用dom。dom的兼容性比canvas好，“优雅降级”的思路是不支持canvas时则使用dom。
+
+两种显示方法看起来实现完全不同， 但是他们有一个很大的交集就是数据，数据是共用的，不同的只是绘画方法。
+
+### 基本结构
+OOP思想在这里就很适合。
+
+基本结构如下：
+```js
+//五子棋对象
+function FiveChess (option) { 
+    //初始化数据
+    this.width = option.width;
+    ...
+ }
+ FiveChess.prototype = {
+    //canvas的方法
+    canvasFn: function () {
+      ...
+    },
+    //dom的方法
+    domFn: function () {
+      ...
+    },
+    ...
+ }
+ 
+```
+对象调用不同的方法，就会得到不同的结果。
+
+## 棋盘与落子层独立
+### canvas
+```js
+<div>
+  //绘制棋盘的canvas
+  <canvas></canvas>
+  
+  //绘制棋子的canvas,完全重叠在棋盘canvas上
+  <canvas></canvas> 
+<div>
+```
+因为我们有悔棋功能，意味着需要清理画布，如果只用一个canvas，悔棋需要清理整个画布然后重绘。如果落子单独用一个canvas,悔棋只需要清理那颗子的位置就可以了。
+
+### dom
+dom的实现比canvas简单很多，棋盘直接用表格，棋子定位到对应的位置即可。
+```js
+<div>
+  //绘制棋盘的table
+  <table>
+  <tr><td></td>...</tr>
+  ...
+  </table>
+  
+  //绘制棋子的div
+  <div></div>
+  ...
+<div>
+```
+
+## 降级判定
+
+需要去根据支持情况，选择合适的方法。
+```js
+//辅助函数
+ helper: {
+  //检测是否支持canvas
+  supportCav: (function () {
+   var cav = document.createElement('canvas');
+   //return false;
+   return !!cav.getContext;
+  })(),
+  //是否支持Transforms3d
+  supportTransforms3d : (function () {
+            var div = document.createElement('div').style;
+            return ('webkitPerspective' in div || 'MozPerspective' in div || 'OPerspective' in div || 'MsPerspective' in div || 'perspective' in div);
+   })()
+ },
+```
+
+知道了支持情况，就可以调用对应的方法了。
+
+例如：
+```js
+//绘制棋盘
+drawBg: function (cxt, width, space) {
+  //支持canvas， 用canvas绘制棋盘
+  if(this.helper.supportCav){
+   ....
+  }else{
+   //不支持则用dom绘制棋盘
+   ...
+  }
+},
+```
+
+
+## 落子位置判定
+
+使用 **getBoundingClientRect()** 方法可以取得棋盘相对视口的位置，与点击事件的clientX/Y做差，就可以得出点击位置相对棋盘的偏移量，这样就可以计算出落子的位置了。
+
+## 悔棋、撤销悔棋功能
+
+存储数据：
+```js
+//存储棋子的位置数据
+this.allStore = {};
+/**
+  记录每次落子的action,便于回溯,每3个数据为一次action,
+  格式为[color, x, y, color, x, y ....]
+*/
+this.action = [];
+//如果是dom版本的，会把每一步的棋子dom，存进去actionDom
+this.actionDom = [];
+//记录悔了几步棋
+this.backActionNum = 0;
+```
+实现悔棋，需要将每一步记录下来，使用的是一个数组，调用**slice**就可以取对应的数据，因为数据简单，所以[color, x, y, color, x, y ....]这样的数据格式就满足需求了，如果数据量复杂，还是用对象比较方便，就像这样[{...},{...}...]。
+
+在悔棋、撤销悔棋的过程中，只要不做落子操作，**this.action**里的数据是不变的，只有等待落子后，才会去增删this.action的数据。
+
+### 删子
+悔棋意味着要删子，从**this.action**取出的数据可以清晰明了的知道子的位置。
+
+#### canvas：
+知道位子信息，调用**clearRect** 即可清理对应的画布。
+```js
+this.cavchessCxt.clearRect(x, y, witdh, height);
+```
+#### dom：
+**this.actionDom = []** 这个数组是存储棋子dom的，悔棋则取出最后一个删掉即可。
+```js
+this.wrap.removeChild(this.actionDom.pop());
+```
+
+完整的代码：
+```js
+ //删子代码
+clearChress: function (x, y, witdh, height) {
+  if(this.helper.supportCav){
+   this.cavchessCxt.clearRect(x, y, witdh, height);
+  }else{
+   this.wrap.removeChild(this.actionDom.pop());
+  }
+ }
+```
+
+### 撤销悔棋
+
+因为悔棋
+
+
+## 胜负判定
+
+感觉较为合适的算法就是判断最后一颗子的四个方位（横、竖、斜、反斜）是否形成连成5连，小优化就是9子之前不需要判断输赢。
+
+## 人机对战
+
+还在研究中...
+
+
+
+
 
