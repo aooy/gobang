@@ -1,0 +1,17 @@
+.absolute{
+	position: absolute;
+	left: 0; top:0;
+}
+.tab{
+	position: absolute;
+	top: 0;left:0;
+	border-collapse:collapse;
+	z-index: 20;
+}
+.tab td{ 
+	border:black 1px solid;
+	box-sizing:border-box;
+} 
+.btnCon{
+	margin-top: 20px;
+}
