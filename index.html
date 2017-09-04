@@ -12,10 +12,14 @@
 	<button type="button" id="backBtn">悔棋</button>
 	<button type="button" id="revokeBackBtn">撤销悔棋</button>
 	<button type="button" id="reStartBtn">重新开始</button>
+	<span id="info"><span>
 </div>
 
 </body>
 <script type="text/javascript" src="./fiveChess.js"></script>
+
+<script type="text/javascript" src="./machine.js"></script>
+
 <script type="text/javascript">
 	//初始化
 	var option = {
@@ -24,12 +28,13 @@
 		'backId': '#backBtn',
 		'revokeBackId': '#revokeBackBtn',
 		'restartId': '#reStartBtn',
+		//'useDom': true,
 		'winCallback': function(bool){
-			var color = bool?'黑':'白';
+			var color = bool===1?'黑':'白';
 			setTimeout(function(){
 				alert(color+'棋赢');
 			},0)
-		}
+		},
 	};
 	var fiveChressobj = new FiveChess(option);
 	fiveChressobj.init();
