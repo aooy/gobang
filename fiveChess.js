@@ -8,6 +8,7 @@
 	function isDef (s) { return s !== undefined; }
 
 	function FiveChess (option) {
+		if(!this.helper.isObject(option)) option = {};
 		//棋盘的宽度,不能低于32px
 		this.width = (isDef(option.width) && Number(option.width) !== NaN && (Number(option.width)>=32)) ? Number(option.width) : 480;
 		//外层包裹的div
@@ -25,8 +26,10 @@
 		//标准棋盘15*15,计算间距
 		this.lineNum = 15;
 		this.space = Math.floor(this.width/(this.lineNum + 1));
+		//是否使用dom版本
+		this.useDom = (isDef(option.useDom) && typeof option.useDom === 'boolean') ? option.useDom : false;
 		//初始化一些样式
-		if(this.helper.supportCav){
+		if(this.usecav()){
 			 //棋盘背景的canvas
 			 this.cavbg = document.createElement('canvas')
 			 this.cavbgCxt = this.cavbg.getContext("2d"); 
@@ -48,13 +51,22 @@
 		this.offset = 0.5;
 		//棋子半径-1提供一些空隙
 		this.r = Math.floor(this.space/2) - 1;
-		//下一步棋子的颜色,ture为黑，false为白
-		this.color = true;
+		//下一步棋子的颜色,1为黑，2为白
+		this.Tag = {
+			BlACK: 1,
+			WHITE: 2,
+			EMPTY: 0 
+		};
+		this.color = this.Tag.BlACK;
 		//白子黑子颜色
 		this.bcolor = isDef(option.bcolor) ? option.bcolor:'black';
 		this.wcolor = isDef(option.wcolor) ? option.wcolor:'#dbdede';
 		//存储棋子的位置数据
 		this.allStore = {};
+		for(var i = 1; i < this.lineNum+1; i++){
+			//坐标从(1,1)开始
+			this.allStore[i] = {};
+		}
 		/**
 		  记录每次落子的action,便于回溯,每3个数据为一次action,
 		  格式为[color, x, y, color, x, y ....]
@@ -66,6 +78,10 @@
 		this.backActionNum = 0;
 		//棋盘锁定
 		this.lock = false;
+		//搜索深度
+		this.deep = typeof this.deep === 'number' ? option.deep: 2;
+		//初始化人机
+		this.mac = new Machine({'Tag': this.Tag});
 	}
 	FiveChess.prototype = {
 		//辅助函数
@@ -79,7 +95,6 @@
 			//检测是否支持canvas
 			supportCav: (function () {
 				var cav = document.createElement('canvas');
-				//return false;
 				return !!cav.getContext;
 			})(),
 			//是否支持Transforms3d
@@ -88,10 +103,18 @@
 	            return ('webkitPerspective' in div || 'MozPerspective' in div || 'OPerspective' in div || 'MsPerspective' in div || 'perspective' in div);
 	        })()
 		},
+		//是否使用canvas
+		usecav: function () {
+			if(this.helper.supportCav && this.useDom === false){
+				return true;
+			}else{
+				return false;
+			}
+		},
 		//绘制棋盘
 		drawBg: function (cxt, width, space) {
 			//支持canvas
-			if(this.helper.supportCav){
+			if(this.usecav()){
 				for (var i = 0; i <= width; i += space) {
 				//处理边界模糊
 				var pos = i + this.offset;
@@ -135,7 +158,7 @@
 			//被锁定时不允许落子
 			if(this.lock) return;
 			//取得棋盘相对视口的偏移量
-			var rect = this.helper.supportCav?this.cavbg.getBoundingClientRect():this.table.getBoundingClientRect(),
+			var rect = this.usecav()?this.cavbg.getBoundingClientRect():this.table.getBoundingClientRect(),
 				chCxt = this.cavchessCxt,
 			    top = rect.top,
 			    left = rect.left,
@@ -143,40 +166,42 @@
 			    x = Math.round((e.clientX - left)/this.space),
 			    y = Math.round((e.clientY - top)/this.space);
 				//检测是否可以落子,边界及边界以外不行，已经落子的也不行
-				if(x > this.lineNum || x < 1 || y < 1 || y > this.lineNum || (this.allStore[x] && typeof this.allStore[x][y] === 'boolean') ){
+				if(x > this.lineNum || x < 1 || y < 1 || y > this.lineNum || this.allStore[x][y] === this.Tag.BlACK || this.allStore[x][y] === this.Tag.WHITE ){
 					return;
 				}
 				//落子
-				this.downChess(chCxt, x*this.space + this.offset, y*this.space + this.offset, this.r, 0, 2*Math.PI, false, this.color?this.bcolor:this.wcolor);
-				//更新数据
-				this.update(x, y, this.color);
+				this.downChess(chCxt, x, y, this.r, 0, 2*Math.PI, false, this.nextColor()===this.Tag.BlACK?this.bcolor:this.wcolor, false);
 		},
 		//更新数据
-		update: function (x, y, color) {
-				//之前没有该行数据为该行添加{}			
-				if(!this.helper.isObject(this.allStore[x])){
+		update: function (x, y, color, isback) {
+				if(!this.allStore[x]){
 					this.allStore[x] = {};
 				}
 				//保存action
-				if(this.backActionNum > 0){
+				if(!isback && this.backActionNum > 0){
 					//将悔掉的棋子步数记录删除
 					this.action.splice(-3 * this.backActionNum, 3 * this.backActionNum);
 					this.backActionNum = 0;
 				}
-				this.action = this.action.concat([this.color, x, y]);
+				if(!isback) this.action = this.action.concat([this.nextColor(), x, y]);
 				//存进store
 				this.allStore[x][y] = color;
-				this.color = !color;
+				this.color = this.currColor();
 				//判断胜负
-				this.whoWin(this.allStore, x, y);
+				if(!isback && !this.whoWin(this.allStore, x, y) && this.nextColor() === this.Tag.WHITE){
+					//没有赢则轮到人机思考
+					this.machine();
+				}
 		},
-		//绘制棋子
-		downChess: function (cxt, x, y, r, start, end, anticlockwise, color) {
-			
-			if(this.helper.supportCav){
+		//落子
+		downChess: function (cxt, x, y, r, start, end, anticlockwise, color, isback) {
+			var disX = x*this.space + this.offset,
+				disY = y*this.space + this.offset;
+
+			if(this.usecav()){
 				cxt.beginPath();
 				if(typeof color === 'string') cxt.fillStyle = color;
-				cxt.arc(x, y, r, start, end, anticlockwise);
+				cxt.arc(disX, disY, r, start, end, anticlockwise);
 				cxt.fill();
 				cxt.closePath();
 			}else{
@@ -190,8 +215,8 @@
 				elStyle.position = 'absolute';
 				elStyle.zIndex = '20';
 				//dom版本不偏移
-				var offsetX = x - this.offset -(2*r-1)/2;
-				var offsetY = y - this.offset -(2*r-1)/2;
+				var offsetX = disX - this.offset -(2*r-1)/2;
+				var offsetY = disY - this.offset -(2*r-1)/2;
 				if (this.helper.supportTransforms3d){
 					elStyle.webkitTransform = elStyle.MsTransform = elStyle.msTransform = elStyle.MozTransform = elStyle.OTransform = elStyle.transform = 'translate3d(' + offsetX + 'px, ' + offsetY + 'px, 0px)';
 				} else {
@@ -200,14 +225,17 @@
 				}
 				this.wrap.appendChild(chress);
 			}
+
+			//更新数据
+			this.update(x, y, this.nextColor(), isback);
 		},
 		//判断输赢
 		whoWin: function (store, x, y) {
 			//能连成5子，棋盘至少有9颗子，所以9子之前不需要判断输赢
 			if( this.action.length/3 < 9 ) return;
 
-			//判断当前最后一子的是否5连
-			var sum = 1, a = x, b = y, color = !this.color,
+			//判断当前最后一子的是否5连  
+			var sum = 1, a = x, b = y, color = this.currColor(),
 				check = function () {
 					if(sum < 5) {
 						sum = 1, a = x, b = y;
@@ -226,7 +254,7 @@
 			while(store[a-1] && store[--a][y] === color){
 				sum++;
 			}
-			if(check()) return;
+			if(check()) return true;
 			//2.竖
 			while(store[x][++b] === color){
 				sum++;
@@ -235,7 +263,7 @@
 			while(store[x][--b] === color){
 				sum++;
 			}
-			if(check()) return;
+			if(check()) return true;
 			//3.正斜
 			while(store[a+1] && store[++a][--b] === color){
 				sum++;
@@ -244,7 +272,7 @@
 			while(store[a-1] && store[--a][++b] === color){
 				sum++;
 			}
-			if(check()) return;
+			if(check()) return true;
 			//4.反斜
 			while(store[a+1] && store[++a][++b] === color){
 				sum++;
@@ -253,10 +281,10 @@
 			while(store[a-1] && store[--a][--b] === color){
 				sum++;
 			}
-			if(check()) return;
+			if(check()) return true;
 		},
 		sayWinner: function () {
-			if(typeof option.winCallback === 'function') option.winCallback(!this.color);
+			if(typeof option.winCallback === 'function') option.winCallback(this.currColor());
 			this.lock = true;
 			return;
 		},
@@ -273,9 +301,15 @@
 				color = backAction[0];
 
 			delete this.allStore[x][y];
+
 			//dom版本删除对应dom
 			this.color = color;
 			this.clearChress(x * this.space - this.r, y * this.space - this.r, this.space, this.space);
+		},
+		backAttch: function(){
+			//棋盘棋子保持偶数
+			this.back();
+			this.back();
 		},
 		//撤销悔棋
 		revokeBack: function () {
@@ -286,15 +320,18 @@
 				x = backAction[1],
 				y = backAction[2],
 				color = backAction[0];
-
+				
 			--this.backActionNum;	
-			this.allStore[x][y] = this.color = color;
-			this.color = !color;
-			this.downChess(this.cavchessCxt, x*this.space + this.offset, y*this.space + this.offset, this.r, 0, 2*Math.PI, false, color?this.bcolor:this.wcolor);
+			this.downChess(this.cavchessCxt, x, y, this.r, 0, 2*Math.PI, false, color===this.Tag.BlACK?this.bcolor:this.wcolor, true);
+		},
+		revokeBackAttch: function () {
+			//棋盘棋子保持偶数
+			this.revokeBack();
+			this.revokeBack();
 		},
 		//把悔棋抹去
 		clearChress: function (x, y, witdh, height) {
-			if(this.helper.supportCav){
+			if(this.usecav()){
 				this.cavchessCxt.clearRect(x, y, witdh, height);
 			}else{
 				this.wrap.removeChild(this.actionDom.pop());
@@ -302,7 +339,7 @@
 		},
 		//清理全部棋子
 		restart: function () {
-			if(this.helper.supportCav){
+			if(this.usecav()){
 				var cav = this.cavchess;
 				this.cavchessCxt.clearRect(0, 0, cav.offsetWidth, cav.offsetHeight);
 			}else{
@@ -316,11 +353,30 @@
 		//重置状态
 		recoverState: function () {
 			this.allStore = {};
+			for(var i = 1; i < this.lineNum+1; i++){
+				//坐标从(1,1)开始
+				this.allStore[i] = {};
+			}
 			this.action = [];
 			this.backActionNum = 0;
 			this.actionDom = [];
-			this.color = true;
+			this.color = 1;
 			this.lock = false;
+		},
+		//返回最后一个棋子颜色
+		currColor: function () {
+			return this.color === this.Tag.BlACK?this.Tag.WHITE:this.Tag.BlACK;
+		},
+		//下一个棋子颜色
+		nextColor: function () {
+			return this.color;
+		},
+		//人机
+		machine: function () {
+			var res = this.mac.go(this.allStore, this.deep);
+
+			this.downChess(this.cavchessCxt, res[0], res[1], this.r, 0, 2*Math.PI, false, this.wcolor);
+			
 		},
 		//初始化函数
 		init: function () {
@@ -329,11 +385,12 @@
 			//监听落子
 	  		document.addEventListener('click', this.checkChess.bind(this));
 	  		//悔棋按钮
-	  		if(this.backBtn) this.backBtn.addEventListener('click',this.back.bind(this));
+	  		if(this.backBtn) this.backBtn.addEventListener('click',this.backAttch.bind(this));
 	  		//撤销悔棋按钮
-	  		if(this.revokeBackBtn) this.revokeBackBtn.addEventListener('click',this.revokeBack.bind(this));
+	  		if(this.revokeBackBtn) this.revokeBackBtn.addEventListener('click',this.revokeBackAttch.bind(this));
 	  		//重新开始按钮
 	  		if(this.restartBtn) this.restartBtn.addEventListener('click',this.restart.bind(this));
+			
 		}
 	}
 	exports.FiveChess = FiveChess;
