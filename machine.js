@@ -20,8 +20,8 @@ function Machine (option) {
 		  ONE: 10,
 		  TWO: 100,
 		  THREE: 1000,
-		  FOUR: 100000,
-		  FIVE: 1000000,
+		  FOUR: 10000,
+		  FIVE: 10000000000000,
 		  BLOCKED_ONE: 1,
 		  BLOCKED_TWO: 10,
 		  BLOCKED_THREE: 100,
@@ -101,13 +101,14 @@ Machine.prototype = {
 		return res;
 	},
 	//对局势的评分，历遍一个子4个方向,从头到位的整行
-	evaluate: function (board) {
+	evaluate: function (board, findwhitewin) {
 		//存储历遍过的行，避免重复计算
 		var across = [],
 			WHITE = this.Tag.WHITE,
 			BlACK = this.Tag.BlACK,
 			EMPTY = this.Tag.EMPTY,
-			socStore = {};
+			socStore = {},
+			whiteWin = false;
 
 		//初始化两方分数
 		socStore[BlACK] = 0;
@@ -135,7 +136,7 @@ Machine.prototype = {
 
 						//处理此行数据
 						resSoc = this.computeRow(row);
-						//console.log('横',resSoc)
+
 						socStore[BlACK] += resSoc[BlACK];
 						socStore[WHITE] += resSoc[WHITE];	
 					}
@@ -158,7 +159,7 @@ Machine.prototype = {
 
 						//处理此行数据
 						resSoc = this.computeRow(row);
-						//console.log('竖',resSoc)
+
 						socStore[BlACK] += resSoc[BlACK];
 						socStore[WHITE] += resSoc[WHITE];	
 					}
@@ -214,7 +215,7 @@ Machine.prototype = {
 						}
 						//处理此行数据
 						resSoc = this.computeRow(row);
-						//console.log('反斜',resSoc)
+
 						socStore[BlACK] += resSoc[BlACK];
 						socStore[WHITE] += resSoc[WHITE];	
 					}
@@ -262,7 +263,7 @@ Machine.prototype = {
 						}
 						//处理此行数据
 						resSoc = this.computeRow(row);
-						//console.log('正斜',resSoc)
+
 						socStore[BlACK] += resSoc[BlACK];
 						socStore[WHITE] += resSoc[WHITE];	
 					}
@@ -270,7 +271,10 @@ Machine.prototype = {
 				}
 			}
 		}
-
+		if(findwhitewin) {
+			if(socStore[WHITE] >= this.score[WHITE].FIVE) return true;
+			return false;
+		}
 		return socStore[WHITE] - socStore[BlACK];
 	},
 	//处理单行数据
@@ -289,7 +293,33 @@ Machine.prototype = {
 		//初始化两方分数
 		socStore[BlACK] = 0;
 		socStore[WHITE] = 0;
-		//console.log(row)
+
+		function changeScore(type) {
+			
+			switch(col.length){
+				case 1:
+					if(type == 0) socStore[currColor] += SCORE[currColor].ONE;
+					if(type == 1) socStore[currColor] += SCORE[currColor].BLOCKED_ONE;
+					break;
+				case 2:
+					if(type == 0) socStore[currColor] += SCORE[currColor].TWO;
+					if(type == 1) socStore[currColor] += SCORE[currColor].BLOCKED_TWO;
+					break;
+				case 3:
+					if(type == 0) socStore[currColor] += SCORE[currColor].THREE;
+					if(type == 1) socStore[currColor] += SCORE[currColor].BLOCKED_THREE;
+					break;
+				case 4:
+					if(type == 0) socStore[currColor] += SCORE[currColor].FOUR;
+					if(type == 1) socStore[currColor] += SCORE[currColor].BLOCKED_FOUR;
+					break;
+				case 5:
+					socStore[currColor] += SCORE[currColor].FIVE;
+					break;	
+			}
+
+		};
+
 		row.forEach(function(v, k){
 			if(v !== EMPTY){
 				//第一次碰到棋子
@@ -301,28 +331,13 @@ Machine.prototype = {
 					if(k === (row.length-1)){
 						lBindex = currIndex - col.length;//左边界的索引，后边肯定是封死的
 						if(row[lBindex] === EMPTY){
-							switch(col.length){
-								case 1:
-									socStore[currColor] += SCORE[currColor].BLOCKED_ONE;
-									break;
-								case 2:
-									socStore[currColor] += SCORE[currColor].BLOCKED_TWO;
-									break;
-								case 3:
-									socStore[currColor] += SCORE[currColor].BLOCKED_THREE;
-									break;
-								case 4:
-									socStore[currColor] += SCORE[currColor].BLOCKED_FOUR;
-									break;
-							}
+							changeScore(1)
 						}
-					//	console.log('最后一个死'+col.length)
 					}
 					return;
 				}
 			}
 			//后边颜色一样
-			//console.log('col',col)
 			if(v === currColor){
 				currIndex = k;
 				col.push(v);
@@ -334,42 +349,17 @@ Machine.prototype = {
 
 					//两头没有被封
 					if(row[lBindex] === EMPTY && row[rBindex] === EMPTY){
-						switch(col.length){
-							case 1:
-								socStore[currColor] += SCORE[currColor].ONE;
-								break;
-							case 2:
-								socStore[currColor] += SCORE[currColor].TWO;
-								break;
-							case 3:
-								socStore[currColor] += SCORE[currColor].THREE;
-								break;
-							case 4:
-								socStore[currColor] += SCORE[currColor].FOUR;
-								break;
-							case 5:
-								socStore[currColor] += SCORE[currColor].FIVE;
-								break;	
-						}
-						//console.log('活'+col.length)
+						changeScore(0)
 					}
 					//有一头被封
 					else if(row[lBindex] === EMPTY ||  row[rBindex] === EMPTY){
-						switch(col.length){
-							case 1:
-								socStore[currColor] += SCORE[currColor].BLOCKED_ONE;
-								break;
-							case 2:
-								socStore[currColor] += SCORE[currColor].BLOCKED_TWO;
-								break;
-							case 3:
-								socStore[currColor] += SCORE[currColor].BLOCKED_THREE;
-								break;
-							case 4:
-								socStore[currColor] += SCORE[currColor].BLOCKED_FOUR;
-								break;
+						changeScore(1)
+					}
+					else{
+						//两头被堵死的5连
+						if(v.length === 5){
+							socStore[currColor] += SCORE[currColor].FIVE;
 						}
-						//console.log('死'+col.length)
 					}
 				}
 
@@ -384,6 +374,7 @@ Machine.prototype = {
 				
 			}
 		})
+
 		return socStore;
 	},
 	//执行查找
@@ -395,18 +386,24 @@ Machine.prototype = {
 			goods = [],
 			mc = this;
 
-		voidChess.forEach(function (c, k) {
+		for(var i = 0; i < voidChess.length; i++){
 
+			var c = voidChess[i]; 
 			board[c[0]][c[1]] = WHITE; 
-			var v = mc.min(board, deep-1, gv > mc.MIN ? gv : mc.MIN, mc.MAX);
-
+			//可以赢了
+			if(this.evaluate(board, true)){
+				delete board[c[0]][c[1]];
+				goods = [c];
+				break;
+			}
+			var v = this.min(board, deep-1, gv > this.MIN ? gv : this.MIN, this.MAX);
 			if(v > gv){
 				gv = v;
 				goods = [];
 				goods.push(c);
 			}
 			delete board[c[0]][c[1]];
-		});
+		}
 		return goods[Math.floor(goods.length * Math.random())];
 	},
 	//最大最小值搜索
